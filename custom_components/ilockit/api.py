@@ -62,7 +62,13 @@ class ILockitApiClient:
     async def async_get_devices(self) -> list[ILockitDeviceState]:
         """Return an overview of devices and their state."""
         devices = await self._request_json("GET", "/api/devices")
-        positions = await self._request_json("GET", "/api/positions")
+        positions = []
+        try:
+            positions = await self._request_json("GET", "/api/positions")
+        except ILockitApiClientError as err:
+            _LOGGER.warning(
+                "Positions request failed, proceeding without positions: %s", err
+            )
         if not isinstance(devices, list):
             devices = []
         if not isinstance(positions, list):
@@ -153,15 +159,25 @@ class ILockitApiClient:
         url = URL(self._base_url + path)
         try:
             async with self._session.request(
-                method, url, auth=self._auth, params=params, json=json
+                method,
+                url,
+                auth=self._auth,
+                params=params,
+                json=json,
+                headers={"accept": "application/json"},
             ) as resp:
                 resp.raise_for_status()
                 return await resp.json()
         except ClientResponseError as err:
+            body = ""
+            try:
+                body = await err.response.text()
+            except Exception:  # noqa: BLE001
+                body = ""
             if err.status == 401:
                 raise ILockitAuthenticationError("Unauthorized") from err
             raise ILockitApiClientError(
-                f"HTTP error {err.status}: {err.message}"
+                f"HTTP error {err.status}: {err.message or ''} {body}".strip()
             ) from err
         except Exception as err:  # noqa: BLE001
             raise ILockitApiClientError(str(err)) from err
