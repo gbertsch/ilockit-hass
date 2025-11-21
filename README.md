@@ -15,12 +15,13 @@ Custom Home Assistant integration for the iLockit cloud API. Initial focus areas
 - Dynamic entity add: when devices are added to the account, they appear on the next refresh without reinstalling the integration.
 - Firmware info: fetched daily via `/api/devices/firmware` and exposed in entity attributes; available version shown if provided by API.
 - Firmware update: API helper for `/api/devices/firmware` POST (deviceId) is available for future service exposure.
+- Service: `ilockit.request_position` (requires `device_id`) to trigger a manual position update for a lock and refresh entities.
 
 ## Repository layout
 - `custom_components/ilockit/manifest.json` – integration metadata for Home Assistant.
 - `custom_components/ilockit/api.py` – async client stub to be filled with the iLockit Cloud API authentication and state calls.
 - `custom_components/ilockit/coordinator.py` – `DataUpdateCoordinator` for polling device state.
-- `custom_components/ilockit/config_flow.py` – UI-based configuration (username/password, optional API base URL).
+- `custom_components/ilockit/config_flow.py` – UI-based configuration (username/password).
 - `custom_components/ilockit/*.py` – platform stubs (lock, battery sensor, alarm binary sensor, device tracker).
 - `custom_components/ilockit/translations/en.json` – config flow and entity labels.
 

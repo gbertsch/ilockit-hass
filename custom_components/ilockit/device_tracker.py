@@ -43,6 +43,7 @@ class ILockitDeviceTrackerEntity(ILockitEntity, TrackerEntity):
 
     _attr_translation_key = "location"
     _attr_should_poll = False
+    _attr_icon = "mdi:bike"
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)

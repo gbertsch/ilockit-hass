@@ -30,6 +30,8 @@ class ILockitEntity(CoordinatorEntity[ILockitDataCoordinator]):
     @property
     def name(self) -> str | None:
         device = self._device
+        if device and getattr(device, "display_name", None):
+            return device.display_name
         return device.name if device else DEFAULT_NAME
 
     @property
@@ -37,7 +39,9 @@ class ILockitEntity(CoordinatorEntity[ILockitDataCoordinator]):
         device = self._device
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
-            name=device.name if device else DEFAULT_NAME,
+            name=(device.display_name if device else DEFAULT_NAME),
+            manufacturer="iLockit",
+            model=(device.raw.get("model") if device and device.raw else None),
         )
 
     @property

@@ -5,6 +5,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
 
 from .api import ILockitApiClient
 from .const import (
@@ -55,6 +56,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ILockitConfigEntry) -> b
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    async def handle_request_position(call) -> None:
+        device_id = str(call.data["device_id"])
+        await api.async_request_position(device_id)
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        DOMAIN,
+        "request_position",
+        handle_request_position,
+        schema=vol.Schema({vol.Required("device_id"): vol.Coerce(str)}),
+    )
+
     return True
 
 

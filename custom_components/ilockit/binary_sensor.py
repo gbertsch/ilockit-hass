@@ -45,6 +45,7 @@ class ILockitAlarmBinarySensor(ILockitEntity, BinarySensorEntity):
 
     _attr_device_class = BinarySensorDeviceClass.SAFETY
     _attr_translation_key = "alarm"
+    _attr_icon = "mdi:alarm-light"
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
@@ -55,3 +56,11 @@ class ILockitAlarmBinarySensor(ILockitEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         device = self._device
         return device.alarm_active if device else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        device = self._device
+        if device and device.firmware_version is not None:
+            attrs = {**attrs, "firmware_version": device.firmware_version}
+        return attrs

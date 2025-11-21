@@ -41,6 +41,7 @@ class ILockitLockEntity(ILockitEntity, LockEntity):
     """Representation of an iLockit lock."""
 
     _attr_translation_key = "lock"
+    _attr_icon = "mdi:lock-smart"
 
     def __init__(
         self,
@@ -57,6 +58,14 @@ class ILockitLockEntity(ILockitEntity, LockEntity):
     def is_locked(self) -> bool | None:
         device = self._device
         return device.locked if device else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        device = self._device
+        if device and device.firmware_version is not None:
+            attrs = {**attrs, "firmware_version": device.firmware_version}
+        return attrs
 
     async def async_lock(self, **kwargs) -> None:
         await self._api.async_set_lock_state(self._device_id, True)

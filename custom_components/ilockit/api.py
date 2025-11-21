@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 import secrets
+import html
 from typing import Any
 
 from aiohttp import BasicAuth, ClientResponseError, ClientSession
@@ -30,6 +31,7 @@ class ILockitDeviceState:
 
     device_id: str
     name: str
+    display_name: str
     firmware_version: float | None = None
     locked: bool | None = None
     battery_level: int | None = None
@@ -86,12 +88,14 @@ class ILockitApiClient:
         for device in devices:
             device_id = device["id"]
             name = device.get("name") or f"ILockit {device_id}"
+            display_name = self._build_display_name(device)
             firmware_version = self._parse_firmware_version(
                 device.get("attributes", {}).get("firmwareVersion")
             )
             state = ILockitDeviceState(
                 device_id=str(device_id),
                 name=name,
+                display_name=display_name,
                 firmware_version=firmware_version,
                 updated_at=self._parse_datetime(device.get("lastUpdate")),
                 raw=device,
@@ -219,6 +223,13 @@ class ILockitApiClient:
             self._firmware_cache[name] = (dt_util.utcnow(), None)
             return None
 
+    async def async_request_position(self, device_id: str) -> dict[str, Any] | None:
+        """Trigger a manual position update for a device."""
+        payload = {"deviceId": int(device_id), "id": 15}
+        resp = await self._request_json("POST", "/api/commands/send", json=payload)
+        _LOGGER.debug("Position request response for %s: %s", device_id, resp)
+        return resp
+
     async def _request_json(
         self,
         method: str,
@@ -282,3 +293,19 @@ class ILockitApiClient:
     def _generate_seed() -> str:
         # 16-byte random hex string
         return secrets.token_hex(16)
+
+    @staticmethod
+    def _build_display_name(device: dict[str, Any]) -> str:
+        name = device.get("name")
+        attrs = device.get("attributes") or {}
+        label = None
+        # try known nested keys for label
+        if isinstance(attrs, dict):
+            for val in attrs.values():
+                if isinstance(val, dict) and "label" in val:
+                    label = val.get("label")
+                    break
+        label = html.unescape(label) if label else None
+        if label:
+            return label
+        return name or "iLockit"
