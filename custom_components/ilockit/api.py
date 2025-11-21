@@ -1,0 +1,184 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+from aiohttp import BasicAuth, ClientResponseError, ClientSession
+from yarl import URL
+
+from homeassistant.util import dt as dt_util
+
+DEFAULT_API_BASE = "https://tracking.ilockit.bike"
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class ILockitApiClientError(Exception):
+    """General ILockit API error."""
+
+
+class ILockitAuthenticationError(ILockitApiClientError):
+    """Raised when authentication fails."""
+
+
+@dataclass
+class ILockitDeviceState:
+    """Subset of state returned by the ILockit API."""
+
+    device_id: str
+    name: str
+    locked: bool | None = None
+    battery_level: int | None = None
+    alarm_active: bool | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    updated_at: datetime | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+class ILockitApiClient:
+    """Async client for the I LOCK IT Cloud API."""
+
+    def __init__(
+        self,
+        session: ClientSession,
+        username: str,
+        password: str,
+        base_url: str | None = DEFAULT_API_BASE,
+    ) -> None:
+        self._session = session
+        self._username = username
+        self._password = password
+        self._base_url = (base_url or DEFAULT_API_BASE).rstrip("/")
+        self._auth = BasicAuth(self._username, self._password)
+
+    async def async_validate_credentials(self) -> None:
+        """Validate credentials against the API by fetching device list."""
+        _LOGGER.debug("Validating credentials for %s", self._username)
+        await self._request_json("GET", "/api/devices")
+
+    async def async_get_devices(self) -> list[ILockitDeviceState]:
+        """Return an overview of devices and their state."""
+        devices = await self._request_json("GET", "/api/devices")
+        positions = await self._request_json("GET", "/api/positions")
+        if not isinstance(devices, list):
+            devices = []
+        if not isinstance(positions, list):
+            positions = []
+        position_by_device: dict[int, dict[str, Any]] = {
+            pos["deviceId"]: pos for pos in positions if isinstance(pos, dict) and "deviceId" in pos
+        }
+
+        states: list[ILockitDeviceState] = []
+        for device in devices:
+            device_id = device["id"]
+            name = device.get("name") or f"ILockit {device_id}"
+            state = ILockitDeviceState(
+                device_id=str(device_id),
+                name=name,
+                updated_at=self._parse_datetime(device.get("lastUpdate")),
+                raw=device,
+            )
+            pos = position_by_device.get(device_id)
+            if pos:
+                state.latitude = pos.get("latitude")
+                state.longitude = pos.get("longitude")
+                state.updated_at = self._parse_datetime(
+                    pos.get("fixTime") or pos.get("serverTime")
+                )
+
+            lock_info = await self._async_get_lock_info(device_id)
+            if lock_info:
+                state.battery_level = lock_info.get("batteryLevel")
+                state.locked = self._parse_lock_state(lock_info.get("lockState"))
+                state.alarm_active = (
+                    lock_info.get("alarmArmed") == 1
+                    if lock_info.get("alarmArmed") is not None
+                    else None
+                )
+                state.raw["lockInfo"] = lock_info
+
+            states.append(state)
+
+        return states
+
+    async def async_set_lock_state(self, device_id: str, locked: bool) -> None:
+        """Lock or unlock the given device."""
+        direction = "close" if locked else "open"
+        payload = {
+            "deviceId": int(device_id),
+            "id": 3,  # locking command
+            "attributes": {"direction": direction},
+        }
+        resp = await self._request_json("POST", "/api/commands/send", json=payload)
+        _LOGGER.debug("Lock command response for %s: %s", device_id, resp)
+
+    async def async_close(self) -> None:
+        """Close any underlying resources if needed."""
+        # aiohttp session is owned by HA; no action required.
+        return None
+
+    async def _async_get_lock_info(self, device_id: int) -> dict[str, Any] | None:
+        """Request lock info for a given device and fetch the response event."""
+        payload = {"deviceId": device_id, "id": 5}
+        resp = await self._request_json("POST", "/api/commands/send", json=payload)
+        event_id = resp.get("eventId")
+        if not event_id:
+            _LOGGER.debug("No eventId returned for lock info request on %s", device_id)
+            return None
+
+        try:
+            event = await self._request_json(
+                "GET", "/api/events", params={"eventId": event_id}
+            )
+        except ILockitApiClientError as err:
+            _LOGGER.debug(
+                "Failed to fetch lock info event %s for %s: %s", event_id, device_id, err
+            )
+            return None
+
+        return event.get("attributes")
+
+    async def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> Any:
+        """Perform an HTTP request and return parsed JSON."""
+        url = URL(self._base_url + path)
+        try:
+            async with self._session.request(
+                method, url, auth=self._auth, params=params, json=json
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except ClientResponseError as err:
+            if err.status == 401:
+                raise ILockitAuthenticationError("Unauthorized") from err
+            raise ILockitApiClientError(
+                f"HTTP error {err.status}: {err.message}"
+            ) from err
+        except Exception as err:  # noqa: BLE001
+            raise ILockitApiClientError(str(err)) from err
+
+    @staticmethod
+    def _parse_datetime(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        return dt_util.parse_datetime(value)
+
+    @staticmethod
+    def _parse_lock_state(lock_state: int | None) -> bool | None:
+        """Map lockState numeric value to bool."""
+        if lock_state is None:
+            return None
+        if lock_state == 2:
+            return True
+        if lock_state == 1:
+            return False
+        return None

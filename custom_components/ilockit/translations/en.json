@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect iLockit",
+        "description": "Provide your iLockit Cloud credentials.",
+        "data": {
+          "username": "Username or email",
+          "password": "Password",
+          "base_url": "API base URL (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Authentication failed. Please check credentials.",
+      "cannot_connect": "Unable to connect to the iLockit API.",
+      "unknown": "Unexpected error. Check logs for details."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "iLockit options",
+        "description": "Adjust polling interval (seconds).",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "scan_interval_low": "Polling interval is too short.",
+      "scan_interval_high": "Polling interval is too long."
+    }
+  },
+  "entity": {
+    "lock": {
+      "lock": {
+        "name": "Lock"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "name": "Battery"
+      }
+    },
+    "binary_sensor": {
+      "alarm": {
+        "name": "Alarm"
+      }
+    },
+    "device_tracker": {
+      "location": {
+        "name": "Location"
+      }
+    }
+  }
+}
