@@ -12,6 +12,7 @@ Custom Home Assistant integration for the iLockit cloud API. Initial focus areas
 - Translation strings and placeholders are in place for UI configuration.
 - Polling interval is adjustable via the integration options (default 30s, clamped between 10s–300s) so we can align update rate with the cloud API, especially for location freshness.
 - Dynamic entity add: when devices are added to the account, they appear on the next refresh without reinstalling the integration.
+- Firmware info: fetched daily via `/api/devices/firmware` and exposed in entity attributes; available version shown if provided by API.
 
 ## Repository layout
 - `custom_components/ilockit/manifest.json` – integration metadata for Home Assistant.

@@ -18,6 +18,7 @@ class ILockitEntity(CoordinatorEntity[ILockitDataCoordinator]):
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator)
         self._device_id = device_id
+        self._attr_unique_id = device_id
 
     @property
     def _device(self) -> ILockitDeviceState | None:
@@ -25,6 +26,11 @@ class ILockitEntity(CoordinatorEntity[ILockitDataCoordinator]):
             (device for device in self.coordinator.data or [] if device.device_id == self._device_id),
             None,
         )
+
+    @property
+    def name(self) -> str | None:
+        device = self._device
+        return device.name if device else DEFAULT_NAME
 
     @property
     def device_info(self) -> DeviceInfo:

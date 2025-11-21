@@ -36,6 +36,7 @@ class ILockitDeviceState:
     longitude: float | None = None
     updated_at: datetime | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    firmware_available: str | None = None
 
 
 class ILockitApiClient:
@@ -53,6 +54,7 @@ class ILockitApiClient:
         self._password = password
         self._base_url = (base_url or DEFAULT_API_BASE).rstrip("/")
         self._auth = BasicAuth(self._username, self._password)
+        self._firmware_cache: dict[str, tuple[datetime, dict[str, Any] | None]] = {}
 
     async def async_validate_credentials(self) -> None:
         """Validate credentials against the API by fetching device list."""
@@ -101,12 +103,17 @@ class ILockitApiClient:
                 state.locked = self._parse_lock_state(lock_info.get("lockState"))
                 state.alarm_active = (
                     lock_info.get("alarmArmed") == 1
-                if lock_info.get("alarmArmed") is not None
-                else None
-            )
-            state.raw["lockInfo"] = lock_info
+                    if lock_info.get("alarmArmed") is not None
+                    else None
+                )
+                state.raw["lockInfo"] = lock_info
 
-        states.append(state)
+            fw = await self._async_get_firmware_info(name)
+            if fw:
+                state.firmware_available = fw.get("version")
+                state.raw["firmware"] = fw
+
+            states.append(state)
 
         return states
 
@@ -157,6 +164,27 @@ class ILockitApiClient:
             return await self._async_get_lock_info(device_id)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Lock info retrieval failed for %s: %s", device_id, err)
+            return None
+
+    async def _async_get_firmware_info(self, name: str) -> dict[str, Any] | None:
+        """Fetch firmware info by device name with simple daily caching."""
+        if not name:
+            return None
+        cached = self._firmware_cache.get(name)
+        if cached:
+            fetched_at, data = cached
+            if fetched_at and (dt_util.utcnow() - fetched_at).total_seconds() < 86400:
+                return data
+        try:
+            payload = await self._request_json(
+                "GET", "/api/devices/firmware", params={"name": name}
+            )
+            firmware = payload.get("firmware") if isinstance(payload, dict) else None
+            self._firmware_cache[name] = (dt_util.utcnow(), firmware)
+            return firmware
+        except ILockitApiClientError as err:
+            _LOGGER.debug("Firmware info request failed for %s: %s", name, err)
+            self._firmware_cache[name] = (dt_util.utcnow(), None)
             return None
 
     async def _request_json(
