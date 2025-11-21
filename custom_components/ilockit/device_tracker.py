@@ -46,6 +46,7 @@ class ILockitDeviceTrackerEntity(ILockitEntity, TrackerEntity):
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
+        self._attr_name = "Location"
         self._attr_unique_id = f"{device_id}-tracker"
 
     @property

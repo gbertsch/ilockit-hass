@@ -48,6 +48,7 @@ class ILockitAlarmBinarySensor(ILockitEntity, BinarySensorEntity):
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
+        self._attr_name = "Alarm"
         self._attr_unique_id = f"{device_id}-alarm"
 
     @property

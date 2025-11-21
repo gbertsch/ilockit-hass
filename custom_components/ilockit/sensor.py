@@ -51,6 +51,7 @@ class ILockitBatterySensor(ILockitEntity, SensorEntity):
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
+        self._attr_name = "Battery"
         self._attr_unique_id = f"{device_id}-battery"
 
     @property
