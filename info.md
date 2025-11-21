@@ -12,7 +12,7 @@ Custom integration for I LOCK IT GPS locks. Exposes lock control, battery level,
 
 ### Configuration
 - Settings → Devices & Services → Add Integration → search “iLockit”.
-- Enter your cloud username/password (optional custom base URL).
+- Enter your cloud username/password.
 - After setup, adjust polling interval in the integration Options (default 30s, min 10s, max 300s) to balance freshness vs. API limits.
 
 ### Entities

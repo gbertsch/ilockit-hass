@@ -6,8 +6,7 @@
         "description": "Provide your iLockit Cloud credentials.",
         "data": {
           "username": "Username or email",
-          "password": "Password",
-          "base_url": "API base URL (optional)"
+          "password": "Password"
         }
       }
     },

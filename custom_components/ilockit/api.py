@@ -46,7 +46,7 @@ class ILockitApiClient:
         session: ClientSession,
         username: str,
         password: str,
-        base_url: str | None = DEFAULT_API_BASE,
+        base_url: str | None = None,
     ) -> None:
         self._session = session
         self._username = username
@@ -95,18 +95,18 @@ class ILockitApiClient:
                     pos.get("fixTime") or pos.get("serverTime")
                 )
 
-            lock_info = await self._async_get_lock_info(device_id)
+            lock_info = await self._safe_lock_info(device_id)
             if lock_info:
                 state.battery_level = lock_info.get("batteryLevel")
                 state.locked = self._parse_lock_state(lock_info.get("lockState"))
                 state.alarm_active = (
                     lock_info.get("alarmArmed") == 1
-                    if lock_info.get("alarmArmed") is not None
-                    else None
-                )
-                state.raw["lockInfo"] = lock_info
+                if lock_info.get("alarmArmed") is not None
+                else None
+            )
+            state.raw["lockInfo"] = lock_info
 
-            states.append(state)
+        states.append(state)
 
         return states
 
@@ -129,7 +129,11 @@ class ILockitApiClient:
     async def _async_get_lock_info(self, device_id: int) -> dict[str, Any] | None:
         """Request lock info for a given device and fetch the response event."""
         payload = {"deviceId": device_id, "id": 5}
-        resp = await self._request_json("POST", "/api/commands/send", json=payload)
+        try:
+            resp = await self._request_json("POST", "/api/commands/send", json=payload)
+        except ILockitApiClientError as err:
+            _LOGGER.debug("Lock info request failed for %s: %s", device_id, err)
+            return None
         event_id = resp.get("eventId")
         if not event_id:
             _LOGGER.debug("No eventId returned for lock info request on %s", device_id)
@@ -146,6 +150,14 @@ class ILockitApiClient:
             return None
 
         return event.get("attributes")
+
+    async def _safe_lock_info(self, device_id: int) -> dict[str, Any] | None:
+        """Wrapper to avoid failing the whole update if lock info fails."""
+        try:
+            return await self._async_get_lock_info(device_id)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Lock info retrieval failed for %s: %s", device_id, err)
+            return None
 
     async def _request_json(
         self,

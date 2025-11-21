@@ -5,7 +5,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DATA_COORDINATOR, DOMAIN
@@ -21,11 +21,23 @@ async def async_setup_entry(
     coordinator: ILockitDataCoordinator = hass.data[DOMAIN][entry.entry_id][
         DATA_COORDINATOR
     ]
-    entities: list[ILockitAlarmBinarySensor] = [
-        ILockitAlarmBinarySensor(coordinator, device.device_id)
-        for device in coordinator.data or []
-    ]
-    async_add_entities(entities)
+    added: set[str] = set()
+
+    @callback
+    def _sync_entities() -> None:
+        new_entities: list[ILockitAlarmBinarySensor] = []
+        for device in coordinator.data or []:
+            if device.device_id in added:
+                continue
+            new_entities.append(
+                ILockitAlarmBinarySensor(coordinator, device.device_id)
+            )
+            added.add(device.device_id)
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _sync_entities()
+    coordinator.async_add_listener(_sync_entities)
 
 
 class ILockitAlarmBinarySensor(ILockitEntity, BinarySensorEntity):

@@ -5,7 +5,6 @@ DOMAIN = "ilockit"
 DEFAULT_NAME = "ILockit"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
-CONF_BASE_URL = "base_url"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 PLATFORMS: list[Platform] = [

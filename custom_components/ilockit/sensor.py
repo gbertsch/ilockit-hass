@@ -7,7 +7,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DATA_COORDINATOR, DOMAIN
@@ -24,11 +24,21 @@ async def async_setup_entry(
         DATA_COORDINATOR
     ]
 
-    entities: list[ILockitBatterySensor] = [
-        ILockitBatterySensor(coordinator, device.device_id)
-        for device in coordinator.data or []
-    ]
-    async_add_entities(entities)
+    added: set[str] = set()
+
+    @callback
+    def _sync_entities() -> None:
+        new_entities: list[ILockitBatterySensor] = []
+        for device in coordinator.data or []:
+            if device.device_id in added:
+                continue
+            new_entities.append(ILockitBatterySensor(coordinator, device.device_id))
+            added.add(device.device_id)
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _sync_entities()
+    coordinator.async_add_listener(_sync_entities)
 
 
 class ILockitBatterySensor(ILockitEntity, SensorEntity):

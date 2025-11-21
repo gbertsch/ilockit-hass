@@ -12,7 +12,6 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import ILockitApiClient, ILockitApiClientError, ILockitAuthenticationError
 from .const import (
-    CONF_BASE_URL,
     CONF_SCAN_INTERVAL,
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -30,7 +29,6 @@ def _build_schema(user_input: dict[str, Any] | None) -> vol.Schema:
         {
             vol.Required(CONF_USERNAME, default=defaults.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD, default=defaults.get(CONF_PASSWORD, "")): str,
-            vol.Optional(CONF_BASE_URL, default=defaults.get(CONF_BASE_URL, "")): str,
         }
     )
 
@@ -41,7 +39,6 @@ async def _validate_credentials(hass: HomeAssistant, data: dict[str, Any]) -> No
         session=session,
         username=data[CONF_USERNAME],
         password=data[CONF_PASSWORD],
-        base_url=data.get(CONF_BASE_URL) or None,
     )
     await client.async_validate_credentials()
 

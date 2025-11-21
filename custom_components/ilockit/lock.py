@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import ILockitApiClient
@@ -20,11 +20,21 @@ async def async_setup_entry(
     coordinator: ILockitDataCoordinator = data[DATA_COORDINATOR]
     api: ILockitApiClient = data[DATA_API]
 
-    entities: list[ILockitLockEntity] = [
-        ILockitLockEntity(coordinator, api, device.device_id)
-        for device in coordinator.data or []
-    ]
-    async_add_entities(entities)
+    added: set[str] = set()
+
+    @callback
+    def _sync_entities() -> None:
+        new_entities: list[ILockitLockEntity] = []
+        for device in coordinator.data or []:
+            if device.device_id in added:
+                continue
+            new_entities.append(ILockitLockEntity(coordinator, api, device.device_id))
+            added.add(device.device_id)
+        if new_entities:
+            async_add_entities(new_entities)
+
+    _sync_entities()
+    coordinator.async_add_listener(_sync_entities)
 
 
 class ILockitLockEntity(ILockitEntity, LockEntity):

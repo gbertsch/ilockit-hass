@@ -11,6 +11,7 @@ Custom Home Assistant integration for the iLockit cloud API. Initial focus areas
 - API client now talks to `https://tracking.ilockit.bike` with basic auth, pulls devices, latest positions, and issues `getLockInfo` commands to derive battery/lock/alarm state; lock/unlock uses the `locking` command (id 3) with direction attribute.
 - Translation strings and placeholders are in place for UI configuration.
 - Polling interval is adjustable via the integration options (default 30s, clamped between 10s–300s) so we can align update rate with the cloud API, especially for location freshness.
+- Dynamic entity add: when devices are added to the account, they appear on the next refresh without reinstalling the integration.
 
 ## Repository layout
 - `custom_components/ilockit/manifest.json` – integration metadata for Home Assistant.
@@ -25,10 +26,9 @@ Custom Home Assistant integration for the iLockit cloud API. Initial focus areas
 2. Copy or link `custom_components/ilockit` into `config/custom_components/ilockit`.
 3. Restart Home Assistant.
 4. Add the integration via Settings → Devices & Services → “Add Integration” → search for “iLockit.”
-5. Use fake credentials for now; the API client will need real calls before entities populate.
+5. Enter your tracking.ilockit.bike username/password. Multiple accounts are supported by adding the integration again with different credentials.
 
 ## Implementation checklist (next iterations)
 - Verify lock-info/position polling cadence vs. API limits; consider caching or throttling lock-info requests per device if needed.
-- Add dynamic entity add/remove when device list changes.
 - Add unit tests around the API client and coordinator once endpoints are known.
 - Consider HACS metadata once the integration is functional.
