@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+import secrets
 from typing import Any
 
 from aiohttp import BasicAuth, ClientResponseError, ClientSession
@@ -29,6 +30,7 @@ class ILockitDeviceState:
 
     device_id: str
     name: str
+    firmware_version: float | None = None
     locked: bool | None = None
     battery_level: int | None = None
     alarm_active: bool | None = None
@@ -55,6 +57,7 @@ class ILockitApiClient:
         self._base_url = (base_url or DEFAULT_API_BASE).rstrip("/")
         self._auth = BasicAuth(self._username, self._password)
         self._firmware_cache: dict[str, tuple[datetime, dict[str, Any] | None]] = {}
+        self._last_devices: list[ILockitDeviceState] = []
 
     async def async_validate_credentials(self) -> None:
         """Validate credentials against the API by fetching device list."""
@@ -83,9 +86,13 @@ class ILockitApiClient:
         for device in devices:
             device_id = device["id"]
             name = device.get("name") or f"ILockit {device_id}"
+            firmware_version = self._parse_firmware_version(
+                device.get("attributes", {}).get("firmwareVersion")
+            )
             state = ILockitDeviceState(
                 device_id=str(device_id),
                 name=name,
+                firmware_version=firmware_version,
                 updated_at=self._parse_datetime(device.get("lastUpdate")),
                 raw=device,
             )
@@ -115,23 +122,48 @@ class ILockitApiClient:
 
             states.append(state)
 
+        self._last_devices = states
         return states
 
     async def async_set_lock_state(self, device_id: str, locked: bool) -> None:
         """Lock or unlock the given device."""
         direction = "close" if locked else "open"
-        payload = {
+        device_state = next(
+            (d for d in self._last_devices if d.device_id == device_id), None
+        ) if hasattr(self, "_last_devices") else None
+        firmware = device_state.firmware_version if device_state else None
+        payload: dict[str, Any] = {
             "deviceId": int(device_id),
             "id": 3,  # locking command
-            "attributes": {"direction": direction},
+            "attributes": {},
         }
+
+        if firmware is not None and firmware < 34:
+            raise ILockitApiClientError(
+                f"Locking command not supported on firmware {firmware}"
+            )
+
+        if firmware is None or firmware < 35.5:
+            payload["attributes"]["lockingSeed"] = self._generate_seed()
+
+        payload["attributes"]["direction"] = direction
+
         resp = await self._request_json("POST", "/api/commands/send", json=payload)
-        _LOGGER.debug("Lock command response for %s: %s", device_id, resp)
+        _LOGGER.debug(
+            "Lock command response for %s (fw=%s): %s", device_id, firmware, resp
+        )
 
     async def async_close(self) -> None:
         """Close any underlying resources if needed."""
         # aiohttp session is owned by HA; no action required.
         return None
+
+    async def async_start_firmware_update(self, device_id: str) -> dict[str, Any]:
+        """Start a firmware update for a specific device."""
+        params = {"deviceId": int(device_id)}
+        resp = await self._request_json("POST", "/api/devices/firmware", params=params)
+        _LOGGER.debug("Firmware update response for %s: %s", device_id, resp)
+        return resp
 
     async def _async_get_lock_info(self, device_id: int) -> dict[str, Any] | None:
         """Request lock info for a given device and fetch the response event."""
@@ -238,3 +270,15 @@ class ILockitApiClient:
         if lock_state == 1:
             return False
         return None
+
+    @staticmethod
+    def _parse_firmware_version(raw: Any) -> float | None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _generate_seed() -> str:
+        # 16-byte random hex string
+        return secrets.token_hex(16)

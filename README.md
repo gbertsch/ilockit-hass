@@ -9,10 +9,12 @@ Custom Home Assistant integration for the iLockit cloud API. Initial focus areas
 ## Current status
 - Scaffolding for a Home Assistant config flow, coordinator, and entity platforms (lock, battery sensor, alarm binary sensor, device tracker).
 - API client now talks to `https://tracking.ilockit.bike` with basic auth, pulls devices, latest positions, and issues `getLockInfo` commands to derive battery/lock/alarm state; lock/unlock uses the `locking` command (id 3) with direction attribute.
+- Lock/unlock compatibility: firmware version is read from device attributes; >=35.5 uses direction-only; 34–35.4 includes a random lockingSeed; <34 is treated as unsupported and will raise a user-visible error on lock/unlock.
 - Translation strings and placeholders are in place for UI configuration.
 - Polling interval is adjustable via the integration options (default 30s, clamped between 10s–300s) so we can align update rate with the cloud API, especially for location freshness.
 - Dynamic entity add: when devices are added to the account, they appear on the next refresh without reinstalling the integration.
 - Firmware info: fetched daily via `/api/devices/firmware` and exposed in entity attributes; available version shown if provided by API.
+- Firmware update: API helper for `/api/devices/firmware` POST (deviceId) is available for future service exposure.
 
 ## Repository layout
 - `custom_components/ilockit/manifest.json` – integration metadata for Home Assistant.
