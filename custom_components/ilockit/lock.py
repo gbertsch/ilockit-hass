@@ -3,9 +3,10 @@ from __future__ import annotations
 from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import ILockitApiClient
+from .api import ILockitApiClient, ILockitApiClientError
 from .const import DATA_API, DATA_COORDINATOR, DOMAIN
 from .coordinator import ILockitDataCoordinator
 from .entity import ILockitEntity
@@ -68,9 +69,15 @@ class ILockitLockEntity(ILockitEntity, LockEntity):
         return attrs
 
     async def async_lock(self, **kwargs) -> None:
-        await self._api.async_set_lock_state(self._device_id, True)
+        try:
+            await self._api.async_set_lock_state(self._device_id, True)
+        except ILockitApiClientError as err:
+            raise HomeAssistantError(str(err)) from err
         await self.coordinator.async_request_refresh()
 
     async def async_unlock(self, **kwargs) -> None:
-        await self._api.async_set_lock_state(self._device_id, False)
+        try:
+            await self._api.async_set_lock_state(self._device_id, False)
+        except ILockitApiClientError as err:
+            raise HomeAssistantError(str(err)) from err
         await self.coordinator.async_request_refresh()

@@ -1,0 +1,8 @@
+request_position:
+  name: Request position
+  description: Trigger a manual GPS position update for an iLockit device.
+  fields:
+    device_id:
+      name: Device ID
+      description: Numeric device id from the iLockit Cloud API.
+      example: "59922"

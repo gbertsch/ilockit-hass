@@ -8,6 +8,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DATA_COORDINATOR, DOMAIN
@@ -51,10 +52,17 @@ class ILockitBatterySensor(ILockitEntity, SensorEntity):
 
     def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
-        self._attr_name = "Battery"
+        self._attr_name = "Battery Level"
         self._attr_unique_id = f"{device_id}-battery"
 
     @property
     def native_value(self) -> int | None:
         device = self._device
         return device.battery_level if device else None
+
+    @property
+    def icon(self) -> str | None:
+        device = self._device
+        if device and device.battery_level is not None:
+            return icon_for_battery_level(device.battery_level)
+        return self._attr_icon

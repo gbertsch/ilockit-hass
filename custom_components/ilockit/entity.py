@@ -42,6 +42,8 @@ class ILockitEntity(CoordinatorEntity[ILockitDataCoordinator]):
             name=(device.display_name if device else DEFAULT_NAME),
             manufacturer="iLockit",
             model=(device.raw.get("model") if device and device.raw else None),
+            sw_version=str(device.firmware_version) if device and device.firmware_version else None,
+            serial_number=(device.serial_number if device else None),
         )
 
     @property

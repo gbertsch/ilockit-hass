@@ -25,13 +25,12 @@ async def async_setup_entry(
 
     @callback
     def _sync_entities() -> None:
-        new_entities: list[ILockitAlarmBinarySensor] = []
+        new_entities: list[BinarySensorEntity] = []
         for device in coordinator.data or []:
             if device.device_id in added:
                 continue
-            new_entities.append(
-                ILockitAlarmBinarySensor(coordinator, device.device_id)
-            )
+            new_entities.append(ILockitAlarmBinarySensor(coordinator, device.device_id))
+            new_entities.append(ILockitStatusBinarySensor(coordinator, device.device_id))
             added.add(device.device_id)
         if new_entities:
             async_add_entities(new_entities)
@@ -64,3 +63,23 @@ class ILockitAlarmBinarySensor(ILockitEntity, BinarySensorEntity):
         if device and device.firmware_version is not None:
             attrs = {**attrs, "firmware_version": device.firmware_version}
         return attrs
+
+
+class ILockitStatusBinarySensor(ILockitEntity, BinarySensorEntity):
+    """Connectivity/status sensor for an iLockit device."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_translation_key = "status"
+    _attr_icon = "mdi:lan-connect"
+
+    def __init__(self, coordinator: ILockitDataCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_name = "Status"
+        self._attr_unique_id = f"{device_id}-status"
+
+    @property
+    def is_on(self) -> bool | None:
+        device = self._device
+        if device and device.status:
+            return device.status.lower() == "online"
+        return None

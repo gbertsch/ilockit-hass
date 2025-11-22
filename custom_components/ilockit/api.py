@@ -33,6 +33,8 @@ class ILockitDeviceState:
     name: str
     display_name: str
     firmware_version: float | None = None
+    serial_number: str | None = None
+    status: str | None = None
     locked: bool | None = None
     battery_level: int | None = None
     alarm_active: bool | None = None
@@ -97,6 +99,8 @@ class ILockitApiClient:
                 name=name,
                 display_name=display_name,
                 firmware_version=firmware_version,
+                serial_number=self._extract_hw_id(device.get("attributes")),
+                status=device.get("status"),
                 updated_at=self._parse_datetime(device.get("lastUpdate")),
                 raw=device,
             )
@@ -309,3 +313,13 @@ class ILockitApiClient:
         if label:
             return label
         return name or "iLockit"
+
+    @staticmethod
+    def _extract_hw_id(attrs: dict[str, Any] | None) -> str | None:
+        if not attrs:
+            return None
+        if isinstance(attrs, dict):
+            for val in attrs.values():
+                if isinstance(val, dict) and "hwId" in val:
+                    return val.get("hwId")
+        return None
