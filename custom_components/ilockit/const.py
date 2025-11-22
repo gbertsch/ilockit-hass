@@ -8,10 +8,7 @@ CONF_PASSWORD = "password"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 PLATFORMS: list[Platform] = [
-    Platform.LOCK,
-    Platform.SENSOR,
     Platform.DEVICE_TRACKER,
-    Platform.BINARY_SENSOR,
 ]
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 30
